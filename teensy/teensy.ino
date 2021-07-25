@@ -11,6 +11,7 @@
 #include "EVE_defines.h"
 #include "EVE_base.h"
 #include "EVE_draw.h"
+#include "parsing.h"
 
 //Serial Input Buffer (default is string)
 char serialInput[256];
