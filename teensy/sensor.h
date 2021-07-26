@@ -3,24 +3,25 @@
 
 enum SensorType {VOLTAGE, CLOCK, TEMPERATURE, LOAD, FAN, FLOW, CONTROL, LEVEL, FACTOR, POWER, DATA, SMALLDATA, THROUGHPUT};
 
+struct STRUCTSENSOR {
+  enum SensorType sensorType;
+  char Name[128];
+  float Value;
+  int OrderedSensorIndex;
+};
+
 class Sensor {
   public:
-  Sensor(char *newName, enum SensorType newSensorType, float newValue, int newOrderedSensorIndex, boolean newIsFirstCPUSensor, boolean newIsFirstGPUSensor, boolean newIsFirstRAMSensor);
+  Sensor(char *newName, enum SensorType newSensorType, float newValue, int newOrderedSensorIndex);
 
   char Name[128];
   enum SensorType sensorType;
   float Value;
   int OrderedSensorIndex;
-  boolean isVisible;
-  boolean isFirstCPUSensor;
-  boolean isFirstGPUSensor;
-  boolean isFirstRAMSensor;
-  int xpos;
+  char sensorArray[256];
 
+  void updateSensorArray();
   char* formatDatatype();
-  void updatePosition(int);
-
-  
   
 };
 

@@ -11,7 +11,6 @@
 #include "EVE_defines.h"
 #include "EVE_base.h"
 #include "EVE_draw.h"
-#include "parsing.h"
 
 //Serial Input Buffer (default is string)
 char serialInput[256];
@@ -30,24 +29,16 @@ boolean ramsensors        = false;
 boolean sensordata        = false;
 boolean screenInitialized = false;
 
-//Linked List containing ADDRESSES to Sensor objects
-LinkedList<Sensor*> allsensors = LinkedList<Sensor*>();
+//Linked Lists containing ADDRESSES to Sensor objects
+LinkedList<Sensor*> CPUSensors = LinkedList<Sensor*>();
+LinkedList<Sensor*> GPUSensors = LinkedList<Sensor*>();
+LinkedList<Sensor*> RAMSensors = LinkedList<Sensor*>();
 
 bool onlyOnce = false;
 
 int orderedSensorIndex = 0;
 
-int posx = 100;
-int posy = 0;
-int rectheight = 70;
-int rectwidth = 120;
-int rectoffset = 80;
-int padding = 30;
-int verticalscrolloffset = 60;
-int numberofvisible = 0;
- 
-int upnext = 4;
-
+void parseSerialData();
 
 //===========================================================================
 void setup()
@@ -83,8 +74,9 @@ void setup()
     //DBG_STAT("Failed to initialize %s8%02X. Stopping.\n", EVE_DEVICE < 0x14 ? "FT" : "BT", EVE_DEVICE);
     while (1);
   }
-  else { 
-    //DBG_STAT("%s8%02X initialized.\n", EVE_DEVICE < 0x14 ? "FT" : "BT", EVE_DEVICE); 
+  else
+  {
+    //DBG_STAT("%s8%02X initialized.\n", EVE_DEVICE < 0x14 ? "FT" : "BT", EVE_DEVICE);
   }
 } //  setup()
 
@@ -100,8 +92,6 @@ void loop()
   //Keep track of the RAM_G memory allocation
   uint32_t RAM_G_Unused_Start;
   RAM_G_Unused_Start = 0;
-
-
 
 
   while (1)
@@ -134,64 +124,36 @@ void loop()
     //========== ADD GRAPHIC ITEMS TO THE DISPLAY LIST ==========
     //Fill background with black
     FWo = EVE_Cmd_Dat_0(FWo, EVE_ENC_COLOR_RGB(0, 0, 0));
+
     FWo = EVE_Filled_Rectangle(FWo, 0, 0, LCD_WIDTH - 1, LCD_HEIGHT - 1);
 
-
-
-    for(int i = 0; i < allsensors.size(); i++){
-      sample = allsensors.get(i);
-
-      //white pen
+    if(screenInitialized){
       FWo = EVE_Cmd_Dat_0(FWo, EVE_ENC_COLOR_RGB(255, 255, 255));
+//      FWo = EVE_Text(FWo, 0, 0, 31, 0, "RAM");
+//      FWo = EVE_Text(FWo, 0, 60, 31, 0, sensorValue );
+      FWo = EVE_Text(FWo, 0, 0, 18, 0, CPUName);
+      FWo = EVE_Text(FWo, 240, 0, 18, 0, GPUName);
+      FWo = EVE_Text(FWo, 280, 100, 18, 0, RAMName);
+        FWo = EVE_Text(FWo, 0, 50, 20, 0, serialInput);
+
+      for(int i = 0; i < CPUSensors.size(); i++){
+        sample = CPUSensors.get(i);
+        FWo = EVE_PrintF(FWo, 0, 18+(i*18), 18, 0, "CPU[%d]: %s,%.2f%s", i, sample->Name, sample->Value, sample->formatDatatype());
+      }
+
+      for(int i = 0; i < GPUSensors.size(); i++){
+        sample = GPUSensors.get(i);
+        FWo = EVE_PrintF(FWo, 240, 18+(i*18), 18, 0, "GPU[%d]: %s, %.2f%s", i, sample->Name, sample->Value, sample->formatDatatype());
+      }
+
       
       
-      //do all this inside the sample sensor
-      //if the sample is visible draw the sensor
-      if(sample->isVisible){
-        if      (sample->isFirstCPUSensor) { 
-          FWo = EVE_Text(FWo, sample->xpos, 0, 31, 0, "CPU"); 
-          FWo = EVE_Text(FWo, sample->xpos, 43, 18, 0, CPUName);
-        }
-        else if (sample->isFirstGPUSensor) { 
-          FWo = EVE_Text(FWo, sample->xpos, 0, 31, 0, "GPU");
-          FWo = EVE_Text(FWo, sample->xpos, 43, 18, 0, GPUName); 
-        }
-        else if (sample->isFirstRAMSensor) { 
-          FWo = EVE_Text(FWo, sample->xpos, 0, 31, 0, "RAM"); 
-          FWo = EVE_Text(FWo, sample->xpos, 43, 18, 0, RAMName);
-        }
-        FWo = EVE_Filled_Rectangle(FWo, sample->xpos, verticalscrolloffset, (sample->xpos)+rectwidth, rectheight+verticalscrolloffset);
-        //black pen
-        FWo = EVE_Cmd_Dat_0(FWo, EVE_ENC_COLOR_RGB(0, 0, 0));
-        FWo = EVE_PrintF(FWo, sample->xpos, 0+verticalscrolloffset, 30, 0, "%.1f%s", sample->Value, sample->formatDatatype());
-        FWo = EVE_PrintF(FWo, sample->xpos, 36+verticalscrolloffset, 23, 0, "%s", sample->Name);
-        sample->updatePosition(rectwidth);
-      }
-
-
-      //do all this inside the list
-      Sensor* ext;
-      if(upnext == 0){
-        ext = allsensors.get(allsensors.size()-1);
-      }
-      else{
-        ext = allsensors.get(upnext - 1);
-      }
-
-      if(ext->xpos == (LCD_WIDTH - rectwidth - padding)){
-       Sensor* nextSensor = allsensors.get(upnext);
-       nextSensor->isVisible = true;
-       allsensors.set(upnext, nextSensor);
-       if(upnext == allsensors.size() - 1){
-        upnext = 0;
-       }
-       else{
-        upnext++;
-       }
-      }
+  
+      //set the backlight
+      EVE_REG_Write_8(EVE_REG_PWM_DUTY, 128);
     }
-      
-      
+
+
     //========== FINSH AND SHOW THE DISPLAY LIST ==========
     // Instruct the graphics processor to show the list
     FWo = EVE_Cmd_Dat_0(FWo, EVE_ENC_DISPLAY());
@@ -199,7 +161,6 @@ void loop()
     FWo = EVE_Cmd_Dat_0(FWo, EVE_ENC_CMD_SWAP);
     // Update the ring buffer pointer so the graphics processor starts executing
     EVE_REG_Write_16(EVE_REG_CMD_WRITE, (FWo));
-    
   }  // while(1)
 } // loop()
 //===========================================================================
@@ -223,6 +184,7 @@ void recvWithStartEndMarkers() {
       //state that there is a complete sentence recieved
       if (recievedChar == endMarker) {
         recvInProgress = false;
+        newData = true;
         parseSerialData();
       }
       //special case: a newline is recieved before the end marker
@@ -232,6 +194,7 @@ void recvWithStartEndMarkers() {
         recvInProgress = false;
         memset(serialInput, 0, sizeof(serialInput));
         indexOfInput = 0;
+        //serialInput = "";
       }
       //general case
       //append the recieved character to the input string
@@ -247,10 +210,11 @@ void recvWithStartEndMarkers() {
 }
 
 void parseSerialData() {
+  if (newData == true) {
     if (strcmp(serialInput, "componentend") == 0)   { component = false; }
-    if (strcmp(serialInput, "cpusensorsend") == 0)  { cpusensors = false; onlyOnce = false; }
-    if (strcmp(serialInput, "gpusensorsend") == 0)  { gpusensors = false; onlyOnce = false; }
-    if (strcmp(serialInput, "ramsensorsend") == 0)  { ramsensors = false; onlyOnce = false; }
+    if (strcmp(serialInput, "cpusensorsend") == 0)  { cpusensors = false; }
+    if (strcmp(serialInput, "gpusensorsend") == 0)  { gpusensors = false; }
+    if (strcmp(serialInput, "ramsensorsend") == 0)  { ramsensors = false; }
 
     if (component) {
       if      (strncmp(serialInput, "CPU: ", 5) == 0) { memmove(CPUName, serialInput + 5, strlen(serialInput)); }
@@ -259,81 +223,84 @@ void parseSerialData() {
     }
 
     if (cpusensors) {
-      char* rawSensorType = strtok(serialInput, ",");
-      if(rawSensorType != NULL) {
-        enum SensorType sensorType = intToSensorType(atoi(rawSensorType));
-        char* rawSensorName = strtok(NULL, ",");
-        if(rawSensorName != NULL){
-          if(!onlyOnce){
-            Sensor* newSensor = new Sensor(rawSensorName, sensorType, 0.0, orderedSensorIndex, true, false, false);
-            onlyOnce = true;
-            orderedSensorIndex++;
-            allsensors.add(newSensor);
-          }
-          else{
-            Sensor* newSensor = new Sensor(rawSensorName, sensorType, 0.0, orderedSensorIndex, false, false, false);
-            orderedSensorIndex++;
-            allsensors.add(newSensor);
-          }
-          
+      char* token = strtok(serialInput, ",");
+      if(token != NULL) {
+        enum SensorType sensorType = intToSensorType(atoi(token));
+        token = strtok(NULL, ",");
+        if(token != NULL){
+          char* sensorname = token;
+          Sensor* newSensor = new Sensor(sensorname, sensorType, 0.0, orderedSensorIndex);
+          orderedSensorIndex++;
+          CPUSensors.add(newSensor);
         }
       }
     }
 
     if (gpusensors) {
-      char* rawSensorType = strtok(serialInput, ",");
-      if(rawSensorType != NULL) {
-        enum SensorType sensorType = intToSensorType(atoi(rawSensorType));
-        char* rawSensorName = strtok(NULL, ",");
-        if(rawSensorName != NULL){
-          if(!onlyOnce){
-            Sensor* newSensor = new Sensor(rawSensorName, sensorType, 0.0, orderedSensorIndex, false, true, false);
-            onlyOnce = true;
-            orderedSensorIndex++;
-            allsensors.add(newSensor);
-          }
-          else{
-            Sensor* newSensor = new Sensor(rawSensorName, sensorType, 0.0, orderedSensorIndex, false, false, false);
-            orderedSensorIndex++;
-            allsensors.add(newSensor);
-          }
+      char* token = strtok(serialInput, ",");
+      if(token != NULL){
+        enum SensorType sensorType = intToSensorType(atoi(token));
+        token = strtok(NULL, ",");
+        if(token != NULL){
+          char* sensorname = token;
+          Sensor* newSensor = new Sensor(sensorname, sensorType, 0.0, orderedSensorIndex);
+          orderedSensorIndex++;
+          GPUSensors.add(newSensor);
         }
       }
     }
 
     if (ramsensors) {
-      char* rawSensorType = strtok(serialInput, ",");
-      if(rawSensorType != NULL) {
-        enum SensorType sensorType = intToSensorType(atoi(rawSensorType));
-        char* rawSensorName = strtok(NULL, ",");
-        if(rawSensorName != NULL){
-          if(!onlyOnce){
-            Sensor* newSensor = new Sensor(rawSensorName, sensorType, 0.0, orderedSensorIndex, false, false, true);
-            onlyOnce = true;
-            orderedSensorIndex++;
-            allsensors.add(newSensor);
-          }
-          else{
-            Sensor* newSensor = new Sensor(rawSensorName, sensorType, 0.0, orderedSensorIndex, false, false, false);
-            orderedSensorIndex++;
-            allsensors.add(newSensor);
-          }
+      char* token = strtok(serialInput, ",");
+      if(token != NULL){
+        enum SensorType sensorType = intToSensorType(atoi(token));
+        token = strtok(NULL, ",");
+        if(token != NULL){
+          char* sensorname = token;
+          Sensor* newSensor = new Sensor(sensorname, sensorType, 0.0, orderedSensorIndex);
+          orderedSensorIndex++;
+          RAMSensors.add(newSensor);
         }
       }
     }
 
     if(sensordata) {
-      char* rawReading = strtok(serialInput, ",");
-      if(rawReading != NULL){
-        for(int i = 0; i < orderedSensorIndex; i++) {
-          Sensor* oldSensor = allsensors.get(i);
-          if(oldSensor->OrderedSensorIndex == i){
-            if(rawReading != NULL){ oldSensor->Value = atof(rawReading); }
-            allsensors.set(i, oldSensor);
-            rawReading = strtok(NULL, ",");
+      char* token = strtok(serialInput, ",");
+      if(token != NULL){
+        for(int i = 0; i< orderedSensorIndex; i++) {
+          for(int j = 0; j < CPUSensors.size(); j++) {
+            Sensor* oldSensor = CPUSensors.get(j);
+            if(oldSensor->OrderedSensorIndex == i) {
+              if(token != NULL){ oldSensor->Value = atof(token); }
+              Serial.print("setting new sensor at position ");
+              Serial.print(j);
+              CPUSensors.set(j, oldSensor);
+              token = strtok(NULL, ",");
+            }
           }
-        }
+          for(int j = 0; j < GPUSensors.size(); j++) {
+            Sensor* oldSensor = GPUSensors.get(j);
+            if(oldSensor->OrderedSensorIndex == i) {
+              if(token != NULL){
+                oldSensor->Value = atof(token);
+              }
+              GPUSensors.set(j, oldSensor);
+              token = strtok(NULL, ",");
+            }
+          }
+          for(int j = 0; j < RAMSensors.size(); j++) {
+            Sensor* oldSensor = RAMSensors.get(j);
+            if(oldSensor->OrderedSensorIndex == i) {
+              if(token != NULL){
+                oldSensor->Value = atof(token);
+              }
+              RAMSensors.set(j, oldSensor);
+              token = strtok(NULL, ",");
+            }
+          }
       }
+      }
+      
     }
 
     //complete handshake
@@ -365,4 +332,6 @@ void parseSerialData() {
 
     //empty the serial input buffer
     memset(serialInput, 0, sizeof(serialInput));
+    newData = false;
+  }
 }
