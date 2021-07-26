@@ -12,16 +12,22 @@ struct STRUCTSENSOR {
 
 class Sensor {
   public:
-  Sensor(char *newName, enum SensorType newSensorType, float newValue, int newOrderedSensorIndex);
+  Sensor(char *newName, enum SensorType newSensorType, float newValue, int newOrderedSensorIndex, boolean newIsFirstCPUSensor, boolean newIsFirstGPUSensor, boolean newIsFirstRAMSensor);
 
   char Name[128];
   enum SensorType sensorType;
   float Value;
   int OrderedSensorIndex;
-  char sensorArray[256];
+  boolean isVisible;
+  boolean isFirstCPUSensor;
+  boolean isFirstGPUSensor;
+  boolean isFirstRAMSensor;
+  int xpos;
 
-  void updateSensorArray();
   char* formatDatatype();
+  void updatePosition(int);
+
+  
   
 };
 

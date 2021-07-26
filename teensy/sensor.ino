@@ -1,16 +1,31 @@
 #include "sensor.h"
 
 
-Sensor::Sensor(char *newName, enum SensorType newSensorType, float newValue, int newOrderedSensorIndex){
+Sensor::Sensor(char *newName, enum SensorType newSensorType, float newValue, int newOrderedSensorIndex, boolean newIsFirstCPUSensor, boolean newIsFirstGPUSensor, boolean newIsFirstRAMSensor){
   strcpy(Name, newName);
   sensorType = newSensorType;
   Value = newValue;
   OrderedSensorIndex = newOrderedSensorIndex;
+  isFirstCPUSensor = newIsFirstCPUSensor;
+  isFirstGPUSensor = newIsFirstGPUSensor;
+  isFirstRAMSensor = newIsFirstRAMSensor;
+  if(newOrderedSensorIndex < 4){
+    isVisible = true;
+    xpos = (newOrderedSensorIndex)*(rectwidth+padding);
+  }
+  else{
+    isVisible = false;
+    xpos = LCD_WIDTH;
+  }
+  
 }
 
-void Sensor::updateSensorArray(){
-  sprintf(sensorArray, "\"%s\",%s,%.2f", Name, "test", Value);
-  
+void Sensor::updatePosition(int widthOfRect){
+  xpos--;
+  if(xpos < -(widthOfRect)){
+    xpos = LCD_WIDTH;
+    isVisible = false;
+  }
 }
 
 char* Sensor::formatDatatype(){
@@ -20,7 +35,7 @@ char* Sensor::formatDatatype(){
     case CLOCK:
       return "MHz";
     case TEMPERATURE:
-      return "test";
+      return "C";
     case LOAD:
       return "%";
     case FAN:
@@ -28,7 +43,7 @@ char* Sensor::formatDatatype(){
     case FLOW:
       return "LPM";
     case CONTROL:
-      return "?";
+      return "%";
     case LEVEL:
       return "%";
     case FACTOR:
